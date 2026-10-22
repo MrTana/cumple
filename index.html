@@ -223,24 +223,36 @@
 
   function render() { renderProximo(); renderMeses(); renderLista(); }
 
+  var diag = { total: 0, conFecha: 0, soloTexto: 0 };
+
   async function cargarContactos(token) {
     var salida = [], pageToken = '';
+    diag = { total: 0, conFecha: 0, soloTexto: 0 };
     do {
       var url = 'https://people.googleapis.com/v1/people/me/connections?personFields=names,birthdays&pageSize=1000'
+        + '&sources=READ_SOURCE_TYPE_CONTACT&sources=READ_SOURCE_TYPE_PROFILE'
         + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
       var r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-      if (!r.ok) throw new Error('Google respondió con error ' + r.status);
-      var j = await r.json();
+      var j = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        var det = (j.error && j.error.message) ? j.error.message : '';
+        throw new Error('Google respondió con error ' + r.status + (det ? ': ' + det : ''));
+      }
       (j.connections || []).forEach(function (p) {
+        diag.total++;
         var nombre = (p.names && p.names[0] && p.names[0].displayName) || '(sin nombre)';
         var bs = p.birthdays || [];
+        var hallado = false;
         for (var i = 0; i < bs.length; i++) {
           var d = bs[i].date;
           if (d && d.month && d.day) {
             salida.push({ nombre: nombre, mes: d.month - 1, dia: d.day, anio: d.year || null });
+            hallado = true;
+            diag.conFecha++;
             break;
           }
         }
+        if (!hallado && bs.length) diag.soloTexto++;
       });
       pageToken = j.nextPageToken || '';
     } while (pageToken);
@@ -268,7 +280,12 @@
         try {
           contactos = await cargarContactos(resp.access_token);
           lsSet('cumple_contactos', JSON.stringify(contactos));
-          setEstado(contactos.length + ' cumpleaños encontrados.');
+          if (!google.accounts.oauth2.hasGrantedAllScopes(resp, SCOPE)) {
+            setEstado('No se concedió el permiso de contactos. Vuelve a conectar y deja marcada la casilla de ver tus contactos.', true);
+          } else {
+            setEstado(diag.total + ' contactos revisados · ' + diag.conFecha + ' con cumpleaños'
+              + (diag.soloTexto ? ' · ' + diag.soloTexto + ' con fecha en formato de texto (no se pueden leer)' : '') + '.', diag.total === 0);
+          }
           render();
         } catch (e) {
           setEstado(e.message, true);
