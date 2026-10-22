@@ -234,7 +234,7 @@
   }
 
   function renderLista() {
-    $('tituloMes').textContent = MESES[mes] + ' ' + anioActual;
+    $('tituloMes').textContent = MESES[mes];
     var ul = $('lista');
     ul.textContent = '';
     var delMes = contactos.filter(function (c) { return c.mes === mes; })
@@ -400,6 +400,13 @@
     setEstado('Abre esta página desde un servidor (por ejemplo http://localhost:8080); Google no permite el inicio de sesión desde un archivo local.', true);
   }
   render();
+
+  // Al volver a la app (aunque estuviera abierta en segundo plano), siempre se muestra el mes actual.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    hoy = new Date(); anioActual = hoy.getFullYear(); mes = hoy.getMonth();
+    render();
+  });
 
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
