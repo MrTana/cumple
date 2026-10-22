@@ -1,6 +1,6 @@
 // Service worker: deja la app disponible sin conexión.
 // Solo guarda archivos de esta misma página; Google y la People API siempre van directo a la red.
-var CACHE = 'cumple-v2';
+var CACHE = 'cumple-v3';
 var SHELL = [
   './',
   'index.html',

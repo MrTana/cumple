@@ -153,6 +153,7 @@
   var hoy = new Date();
   var anioActual = hoy.getFullYear();
   var mes = hoy.getMonth();
+  var anioVista = anioActual; // año que se está mirando (se puede avanzar al siguiente y volver)
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -234,7 +235,7 @@
   }
 
   function renderLista() {
-    $('tituloMes').textContent = MESES[mes];
+    $('tituloMes').textContent = MESES[mes] + ' ' + anioVista;
     var ul = $('lista');
     ul.textContent = '';
     var delMes = contactos.filter(function (c) { return c.mes === mes; })
@@ -245,7 +246,7 @@
       ul.appendChild(li);
       return;
     }
-    var esMesActual = mes === hoy.getMonth();
+    var esMesActual = mes === hoy.getMonth() && anioVista === anioActual;
     delMes.forEach(function (c) {
       var esHoy = esMesActual && c.dia === hoy.getDate();
       var pasado = esMesActual && c.dia < hoy.getDate();
@@ -253,9 +254,9 @@
       li.appendChild(el('div', 'dia', String(c.dia)));
       var info = el('div', 'info');
       info.appendChild(el('div', 'nombre', c.nombre));
-      var dow = new Intl.DateTimeFormat('es', { weekday: 'long' }).format(new Date(anioActual, c.mes, c.dia));
+      var dow = new Intl.DateTimeFormat('es', { weekday: 'long' }).format(new Date(anioVista, c.mes, c.dia));
       var det = dow.charAt(0).toUpperCase() + dow.slice(1);
-      if (c.anio) det += ' · cumple ' + (anioActual - c.anio);
+      if (c.anio) det += ' · cumple ' + (anioVista - c.anio);
       info.appendChild(el('div', 'muted', det));
       li.appendChild(info);
       if (esHoy) li.appendChild(el('div', 'badge', '¡Hoy!'));
@@ -270,7 +271,11 @@
   function render() { renderProximo(); renderMeses(); renderLista(); }
 
   function cambiarMes(delta) {
-    mes = (mes + 12 + delta) % 12;
+    // Solo el año actual y el siguiente.
+    var nm = mes + delta, na = anioVista;
+    if (nm > 11) { nm = 0; na++; } else if (nm < 0) { nm = 11; na--; }
+    if (na > anioActual + 1 || na < anioActual) return;
+    mes = nm; anioVista = na;
     render();
     var t = $('tarjetaMes');
     var cls = delta > 0 ? 'anim-der' : 'anim-izq';
@@ -404,7 +409,7 @@
   // Al volver a la app (aunque estuviera abierta en segundo plano), siempre se muestra el mes actual.
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'visible') return;
-    hoy = new Date(); anioActual = hoy.getFullYear(); mes = hoy.getMonth();
+    hoy = new Date(); anioActual = hoy.getFullYear(); mes = hoy.getMonth(); anioVista = anioActual;
     render();
   });
 
