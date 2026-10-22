@@ -10,4 +10,8 @@ App web de una sola página que muestra los cumpleaños de tus contactos de Goog
 
 ## Uso
 
-Abre la página, pega tu Client ID de Google en Configuración y pulsa "Conectar con Google". Los datos se guardan solo en tu navegador.
+Abre la página, abre el engrane de arriba, pega tu ID de cliente de Google y pulsa "Conectar con Google". Los datos se guardan solo en tu navegador.
+
+## PWA
+
+La página es instalable (manifest, service worker e iconos en `icons/`). En el teléfono: abre la URL en Chrome (Android) o Safari (iPhone) y elige "Instalar app" / "Añadir a pantalla de inicio". Funciona sin conexión con los últimos cumpleaños guardados.

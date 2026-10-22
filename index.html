@@ -2,8 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cumpleaños</title>
+<meta name="theme-color" content="#404395">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cumpleaños">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
   :root {
     --bg: #f6f6f8; --card: #ffffff; --text: #1f2030; --muted: #6b6d80;
@@ -21,9 +29,27 @@
     font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     -webkit-text-size-adjust: 100%;
   }
-  .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .wrap {
+    max-width: 640px; margin: 0 auto;
+    padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  }
+  header { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   h1 { font-size: 1.3rem; margin: 0; }
+  .gear {
+    width: 42px; height: 42px; padding: 0; display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent); border-radius: 50%;
+  }
+  .gear svg { width: 22px; height: 22px; }
+  .gear[aria-expanded="true"] { background: var(--accent); color: #fff; }
+  .gear .punto { position: absolute; top: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--today); border: 2px solid var(--bg); }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; width: min(320px, calc(100vw - 32px));
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  }
+  .menu[hidden] { display: none; }
+  .menu button.full { width: 100%; margin-top: 10px; }
+  .menu label:first-child { margin-top: 0; }
   button {
     font: inherit; cursor: pointer; border: 0; border-radius: 10px;
     padding: 10px 14px; background: var(--accent); color: #fff; font-weight: 600;
@@ -65,15 +91,27 @@
   }
   .msg { margin-top: 8px; font-size: .9rem; }
   .err { color: var(--today); }
-  ol { padding-left: 18px; margin: 8px 0 0; font-size: .9rem; line-height: 1.5; }
-  code { background: var(--accent-soft); padding: 1px 5px; border-radius: 5px; font-size: .85em; }
+  .gear { position: relative; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>🎂 Cumpleaños</h1>
-    <button id="btnConectar">Conectar con Google</button>
+    <button class="gear" id="btnConfig" aria-label="Configuración" aria-haspopup="true" aria-expanded="false" aria-controls="menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span class="punto" id="punto" hidden></span>
+    </button>
+    <div class="menu" id="menu" hidden>
+      <label for="clientId">ID de cliente de Google</label>
+      <input type="text" id="clientId" placeholder="123456-abc.apps.googleusercontent.com" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="sec full" id="guardarId">Guardar</button>
+      <button class="full" id="btnConectar">Conectar con Google</button>
+      <div class="msg" id="estado" role="status"></div>
+    </div>
   </header>
 
   <div class="card" id="proximo" hidden></div>
@@ -89,25 +127,6 @@
     <ul id="lista"></ul>
   </div>
 
-  <div class="card">
-    <details id="config">
-      <summary>Configuración</summary>
-      <label for="clientId">Client ID de Google (OAuth, tipo "Aplicación web")</label>
-      <input type="text" id="clientId" placeholder="123456-abc.apps.googleusercontent.com" autocomplete="off">
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button id="guardarId">Guardar</button>
-        <button class="sec" id="borrar">Borrar datos guardados</button>
-      </div>
-      <ol>
-        <li>En <code>console.cloud.google.com</code> crea un proyecto y activa <b>People API</b>.</li>
-        <li>Pantalla de consentimiento OAuth: tipo externo, agrega tu correo como usuario de prueba.</li>
-        <li>Credenciales → ID de cliente OAuth → Aplicación web.</li>
-        <li>En "Orígenes autorizados de JavaScript" agrega la dirección desde donde abres esta página (por ejemplo <code>http://localhost:8080</code>).</li>
-        <li>Pega aquí el Client ID. Solo se pide permiso de lectura de contactos.</li>
-      </ol>
-    </details>
-    <div class="msg" id="estado"></div>
-  </div>
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -132,9 +151,20 @@
   var $ = function (id) { return document.getElementById(id); };
   var estado = $('estado');
 
+  var menu = $('menu'), btnConfig = $('btnConfig'), punto = $('punto');
+
+  function abrirMenu(abrir) {
+    menu.hidden = !abrir;
+    btnConfig.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  }
+
+  // Un mensaje de error abre el menú para que se vea; el resto no estorba la página principal.
   function setEstado(texto, esError) {
     estado.textContent = texto || '';
     estado.className = 'msg' + (esError ? ' err' : '');
+    estado.style.marginTop = texto ? '10px' : '0';
+    punto.hidden = !esError;
+    if (esError) abrirMenu(true);
   }
 
   function el(tag, cls, text) {
@@ -261,9 +291,10 @@
 
   function conectar() {
     var clientId = (lsGet('cumple_client_id') || '').trim();
+    var escrito = $('clientId').value.trim();
+    if (escrito && escrito !== clientId) { clientId = escrito; lsSet('cumple_client_id', clientId); }
     if (!clientId) {
-      $('config').open = true;
-      setEstado('Primero pega tu Client ID en Configuración.', true);
+      setEstado('Primero pega tu ID de cliente de Google.', true);
       return;
     }
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
@@ -287,6 +318,7 @@
               + (diag.soloTexto ? ' · ' + diag.soloTexto + ' con fecha en formato de texto (no se pueden leer)' : '') + '.', diag.total === 0);
           }
           render();
+          if (diag.total > 0 && !estado.classList.contains('err')) setTimeout(function () { abrirMenu(false); }, 2500);
         } catch (e) {
           setEstado(e.message, true);
         }
@@ -308,21 +340,24 @@
     var v = $('clientId').value.trim();
     if (!v) { setEstado('Pega un Client ID válido.', true); return; }
     lsSet('cumple_client_id', v);
-    setEstado('Client ID guardado. Ya puedes conectar.');
-  });
-  $('borrar').addEventListener('click', function () {
-    lsDel('cumple_contactos'); lsDel('cumple_client_id');
-    contactos = []; $('clientId').value = '';
-    setEstado('Datos borrados de este navegador.');
-    render();
+    setEstado('ID guardado. Ya puedes conectar.');
   });
 
+  btnConfig.addEventListener('click', function (e) { e.stopPropagation(); abrirMenu(menu.hidden); });
+  menu.addEventListener('click', function (e) { e.stopPropagation(); });
+  document.addEventListener('click', function () { abrirMenu(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') abrirMenu(false); });
+
   $('clientId').value = lsGet('cumple_client_id') || '';
-  if (!lsGet('cumple_client_id')) $('config').open = true;
+  if (!lsGet('cumple_client_id')) abrirMenu(true);
   if (location.protocol === 'file:') {
     setEstado('Abre esta página desde un servidor (por ejemplo http://localhost:8080); Google no permite el inicio de sesión desde un archivo local.', true);
   }
   render();
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
 })();
 </script>
 </body>
