@@ -57,8 +57,21 @@
   button.sec { background: var(--accent-soft); color: var(--accent); }
   button:disabled { opacity: .5; cursor: default; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
-  .next { display: flex; align-items: center; gap: 12px; }
-  .next .emoji { font-size: 1.8rem; }
+  .prox-titulo { font-weight: 700; margin-bottom: 4px; }
+  .prox { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .prox:last-child { border-bottom: 0; padding-bottom: 0; }
+  .prox .fecha {
+    width: 48px; flex: 0 0 auto; text-align: center; line-height: 1.1; padding: 5px 0; border-radius: 10px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 1.05rem;
+  }
+  .prox .fecha small { display: block; font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .prox.hoy .fecha { background: var(--today); color: #fff; }
+  html, body { overscroll-behavior-x: none; touch-action: pan-y; min-height: 100%; }
+  .meses { touch-action: pan-x pan-y; }
+  @keyframes entraIzq { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+  @keyframes entraDer { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+  .anim-izq { animation: entraIzq .2s ease-out; }
+  .anim-der { animation: entraDer .2s ease-out; }
   .muted { color: var(--muted); font-size: .9rem; }
   .meses { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; scrollbar-width: thin; }
   .chip {
@@ -118,7 +131,7 @@
 
   <div class="meses" id="meses"></div>
 
-  <div class="card">
+  <div class="card" id="tarjetaMes">
     <div class="nav">
       <button class="sec" id="prev" aria-label="Mes anterior">‹</button>
       <h2 id="tituloMes"></h2>
@@ -185,20 +198,23 @@
     var box = $('proximo');
     box.textContent = '';
     if (!contactos.length) { box.hidden = true; return; }
-    var mejor = null, mejorD = 1e9;
-    contactos.forEach(function (c) {
-      var d = diasHasta(c.mes, c.dia);
-      if (d < mejorD) { mejorD = d; mejor = c; }
+    var proximos = contactos.map(function (c) { return { c: c, d: diasHasta(c.mes, c.dia) }; })
+      .sort(function (a, b) { return a.d - b.d || a.c.nombre.localeCompare(b.c.nombre, 'es'); })
+      .slice(0, 5);
+    box.appendChild(el('div', 'prox-titulo', '🎉 Próximos cumpleaños'));
+    proximos.forEach(function (p) {
+      var fila = el('div', 'prox' + (p.d === 0 ? ' hoy' : ''));
+      var fecha = el('div', 'fecha', String(p.c.dia));
+      fecha.appendChild(el('small', '', MESES[p.c.mes].slice(0, 3)));
+      fila.appendChild(fecha);
+      var info = el('div', 'info');
+      info.appendChild(el('div', 'nombre', p.c.nombre));
+      var dow = new Intl.DateTimeFormat('es', { weekday: 'long' }).format(new Date(anioActual + (new Date(anioActual, p.c.mes, p.c.dia) < new Date(anioActual, hoy.getMonth(), hoy.getDate()) ? 1 : 0), p.c.mes, p.c.dia));
+      info.appendChild(el('div', 'muted', dow.charAt(0).toUpperCase() + dow.slice(1)));
+      fila.appendChild(info);
+      fila.appendChild(el('div', 'badge', p.d === 0 ? '¡Hoy!' : p.d === 1 ? 'Mañana' : 'en ' + p.d + ' d'));
+      box.appendChild(fila);
     });
-    if (!mejor) { box.hidden = true; return; }
-    var fila = el('div', 'next');
-    fila.appendChild(el('div', 'emoji', '🎉'));
-    var info = el('div');
-    info.appendChild(el('div', 'nombre', mejor.nombre));
-    var cuando = mejorD === 0 ? 'Hoy' : mejorD === 1 ? 'Mañana' : 'En ' + mejorD + ' días';
-    info.appendChild(el('div', 'muted', 'Próximo cumpleaños · ' + cuando + ' (' + mejor.dia + ' de ' + MESES[mejor.mes] + ')'));
-    fila.appendChild(info);
-    box.appendChild(fila);
     box.hidden = false;
   }
 
@@ -252,6 +268,16 @@
   }
 
   function render() { renderProximo(); renderMeses(); renderLista(); }
+
+  function cambiarMes(delta) {
+    mes = (mes + 12 + delta) % 12;
+    render();
+    var t = $('tarjetaMes');
+    var cls = delta > 0 ? 'anim-der' : 'anim-izq';
+    t.classList.remove('anim-izq', 'anim-der');
+    void t.offsetWidth;
+    t.classList.add(cls);
+  }
 
   var diag = { total: 0, conFecha: 0, soloTexto: 0 };
 
@@ -334,8 +360,28 @@
   }
 
   $('btnConectar').addEventListener('click', conectar);
-  $('prev').addEventListener('click', function () { mes = (mes + 11) % 12; render(); });
-  $('next').addEventListener('click', function () { mes = (mes + 1) % 12; render(); });
+  $('prev').addEventListener('click', function () { cambiarMes(-1); });
+  $('next').addEventListener('click', function () { cambiarMes(1); });
+
+  // Arrastrar el dedo: izquierda = mes siguiente, derecha = mes anterior.
+  // Funciona sobre la lista del mes y sobre la fila de meses del cuerpo de la página.
+  (function () {
+    var x0 = 0, y0 = 0, t0 = 0, activo = false;
+    var zona = document;
+    zona.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1 || e.target.closest('#meses, .menu, input')) { activo = false; return; }
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); activo = true;
+    }, { passive: true });
+    zona.addEventListener('touchend', function (e) {
+      if (!activo) return;
+      activo = false;
+      var t = e.changedTouches[0];
+      var dx = t.clientX - x0, dy = t.clientY - y0;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - t0 > 800) return;
+      cambiarMes(dx < 0 ? 1 : -1);
+    }, { passive: true });
+    zona.addEventListener('touchcancel', function () { activo = false; }, { passive: true });
+  })();
   $('guardarId').addEventListener('click', function () {
     var v = $('clientId').value.trim();
     if (!v) { setEstado('Pega un Client ID válido.', true); return; }
