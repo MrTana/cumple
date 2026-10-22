@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cumpleaños</title>
+<style>
+  :root {
+    --bg: #f6f6f8; --card: #ffffff; --text: #1f2030; --muted: #6b6d80;
+    --accent: #404395; --accent-soft: #e8e9f6; --line: #e3e3ea; --today: #d85959;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14151c; --card: #1d1f29; --text: #ececf3; --muted: #9a9cb0;
+      --accent: #8d90e8; --accent-soft: #2a2c44; --line: #2b2d3a; --today: #ff7a7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  h1 { font-size: 1.3rem; margin: 0; }
+  button {
+    font: inherit; cursor: pointer; border: 0; border-radius: 10px;
+    padding: 10px 14px; background: var(--accent); color: #fff; font-weight: 600;
+  }
+  button.sec { background: var(--accent-soft); color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .next { display: flex; align-items: center; gap: 12px; }
+  .next .emoji { font-size: 1.8rem; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .meses { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; scrollbar-width: thin; }
+  .chip {
+    flex: 0 0 auto; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font-weight: 600; font-size: .85rem; text-transform: capitalize;
+  }
+  .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .chip small { opacity: .75; margin-left: 4px; font-weight: 400; }
+  .nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 10px; }
+  .nav h2 { margin: 0; font-size: 1.15rem; text-transform: capitalize; }
+  .nav button { padding: 8px 12px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  li:last-child { border-bottom: 0; }
+  li.pasado { opacity: .5; }
+  .dia {
+    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 1.1rem; flex: 0 0 auto;
+  }
+  li.hoy .dia { background: var(--today); color: #fff; }
+  .info { min-width: 0; flex: 1; }
+  .nombre { font-weight: 600; overflow-wrap: anywhere; }
+  .badge { font-size: .8rem; font-weight: 700; color: var(--today); white-space: nowrap; }
+  .vacio { text-align: center; padding: 24px 8px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  label { display: block; margin: 10px 0 4px; font-size: .85rem; color: var(--muted); }
+  input[type=text] {
+    width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text);
+  }
+  .msg { margin-top: 8px; font-size: .9rem; }
+  .err { color: var(--today); }
+  ol { padding-left: 18px; margin: 8px 0 0; font-size: .9rem; line-height: 1.5; }
+  code { background: var(--accent-soft); padding: 1px 5px; border-radius: 5px; font-size: .85em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎂 Cumpleaños</h1>
+    <button id="btnConectar">Conectar con Google</button>
+  </header>
+
+  <div class="card" id="proximo" hidden></div>
+
+  <div class="meses" id="meses"></div>
+
+  <div class="card">
+    <div class="nav">
+      <button class="sec" id="prev" aria-label="Mes anterior">‹</button>
+      <h2 id="tituloMes"></h2>
+      <button class="sec" id="next" aria-label="Mes siguiente">›</button>
+    </div>
+    <ul id="lista"></ul>
+  </div>
+
+  <div class="card">
+    <details id="config">
+      <summary>Configuración</summary>
+      <label for="clientId">Client ID de Google (OAuth, tipo "Aplicación web")</label>
+      <input type="text" id="clientId" placeholder="123456-abc.apps.googleusercontent.com" autocomplete="off">
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button id="guardarId">Guardar</button>
+        <button class="sec" id="borrar">Borrar datos guardados</button>
+      </div>
+      <ol>
+        <li>En <code>console.cloud.google.com</code> crea un proyecto y activa <b>People API</b>.</li>
+        <li>Pantalla de consentimiento OAuth: tipo externo, agrega tu correo como usuario de prueba.</li>
+        <li>Credenciales → ID de cliente OAuth → Aplicación web.</li>
+        <li>En "Orígenes autorizados de JavaScript" agrega la dirección desde donde abres esta página (por ejemplo <code>http://localhost:8080</code>).</li>
+        <li>Pega aquí el Client ID. Solo se pide permiso de lectura de contactos.</li>
+      </ol>
+    </details>
+    <div class="msg" id="estado"></div>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+(function () {
+  var SCOPE = 'https://www.googleapis.com/auth/contacts.readonly';
+  var MESES = [];
+  for (var i = 0; i < 12; i++) {
+    MESES.push(new Intl.DateTimeFormat('es', { month: 'long' }).format(new Date(2026, i, 1)));
+  }
+  var hoy = new Date();
+  var anioActual = hoy.getFullYear();
+  var mes = hoy.getMonth();
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  var contactos = [];
+  try { contactos = JSON.parse(lsGet('cumple_contactos') || '[]'); } catch (e) { contactos = []; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var estado = $('estado');
+
+  function setEstado(texto, esError) {
+    estado.textContent = texto || '';
+    estado.className = 'msg' + (esError ? ' err' : '');
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function diasHasta(m, d) {
+    var base = new Date(anioActual, hoy.getMonth(), hoy.getDate());
+    var f = new Date(anioActual, m, d);
+    if (f < base) f = new Date(anioActual + 1, m, d);
+    return Math.round((f - base) / 86400000);
+  }
+
+  function renderProximo() {
+    var box = $('proximo');
+    box.textContent = '';
+    if (!contactos.length) { box.hidden = true; return; }
+    var mejor = null, mejorD = 1e9;
+    contactos.forEach(function (c) {
+      var d = diasHasta(c.mes, c.dia);
+      if (d < mejorD) { mejorD = d; mejor = c; }
+    });
+    if (!mejor) { box.hidden = true; return; }
+    var fila = el('div', 'next');
+    fila.appendChild(el('div', 'emoji', '🎉'));
+    var info = el('div');
+    info.appendChild(el('div', 'nombre', mejor.nombre));
+    var cuando = mejorD === 0 ? 'Hoy' : mejorD === 1 ? 'Mañana' : 'En ' + mejorD + ' días';
+    info.appendChild(el('div', 'muted', 'Próximo cumpleaños · ' + cuando + ' (' + mejor.dia + ' de ' + MESES[mejor.mes] + ')'));
+    fila.appendChild(info);
+    box.appendChild(fila);
+    box.hidden = false;
+  }
+
+  function renderMeses() {
+    var cont = $('meses');
+    cont.textContent = '';
+    for (var m = 0; m < 12; m++) {
+      (function (m) {
+        var n = contactos.filter(function (c) { return c.mes === m; }).length;
+        var b = el('button', 'chip' + (m === mes ? ' on' : ''), MESES[m]);
+        if (n) b.appendChild(el('small', '', String(n)));
+        b.addEventListener('click', function () { mes = m; render(); });
+        cont.appendChild(b);
+        if (m === mes) setTimeout(function () { b.scrollIntoView({ inline: 'center', block: 'nearest' }); }, 0);
+      })(m);
+    }
+  }
+
+  function renderLista() {
+    $('tituloMes').textContent = MESES[mes] + ' ' + anioActual;
+    var ul = $('lista');
+    ul.textContent = '';
+    var delMes = contactos.filter(function (c) { return c.mes === mes; })
+      .sort(function (a, b) { return a.dia - b.dia || a.nombre.localeCompare(b.nombre, 'es'); });
+    if (!delMes.length) {
+      var li = el('li', 'vacio muted', contactos.length ? 'No hay cumpleaños este mes.' : 'Conecta tu cuenta de Google para ver tus cumpleaños.');
+      li.style.justifyContent = 'center';
+      ul.appendChild(li);
+      return;
+    }
+    var esMesActual = mes === hoy.getMonth();
+    delMes.forEach(function (c) {
+      var esHoy = esMesActual && c.dia === hoy.getDate();
+      var pasado = esMesActual && c.dia < hoy.getDate();
+      var li = el('li', (esHoy ? 'hoy ' : '') + (pasado ? 'pasado' : ''));
+      li.appendChild(el('div', 'dia', String(c.dia)));
+      var info = el('div', 'info');
+      info.appendChild(el('div', 'nombre', c.nombre));
+      var dow = new Intl.DateTimeFormat('es', { weekday: 'long' }).format(new Date(anioActual, c.mes, c.dia));
+      var det = dow.charAt(0).toUpperCase() + dow.slice(1);
+      if (c.anio) det += ' · cumple ' + (anioActual - c.anio);
+      info.appendChild(el('div', 'muted', det));
+      li.appendChild(info);
+      if (esHoy) li.appendChild(el('div', 'badge', '¡Hoy!'));
+      else if (esMesActual && !pasado) {
+        var d = c.dia - hoy.getDate();
+        li.appendChild(el('div', 'badge', d === 1 ? 'Mañana' : 'en ' + d + ' d'));
+      }
+      ul.appendChild(li);
+    });
+  }
+
+  function render() { renderProximo(); renderMeses(); renderLista(); }
+
+  async function cargarContactos(token) {
+    var salida = [], pageToken = '';
+    do {
+      var url = 'https://people.googleapis.com/v1/people/me/connections?personFields=names,birthdays&pageSize=1000'
+        + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+      var r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) throw new Error('Google respondió con error ' + r.status);
+      var j = await r.json();
+      (j.connections || []).forEach(function (p) {
+        var nombre = (p.names && p.names[0] && p.names[0].displayName) || '(sin nombre)';
+        var bs = p.birthdays || [];
+        for (var i = 0; i < bs.length; i++) {
+          var d = bs[i].date;
+          if (d && d.month && d.day) {
+            salida.push({ nombre: nombre, mes: d.month - 1, dia: d.day, anio: d.year || null });
+            break;
+          }
+        }
+      });
+      pageToken = j.nextPageToken || '';
+    } while (pageToken);
+    return salida;
+  }
+
+  function conectar() {
+    var clientId = (lsGet('cumple_client_id') || '').trim();
+    if (!clientId) {
+      $('config').open = true;
+      setEstado('Primero pega tu Client ID en Configuración.', true);
+      return;
+    }
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      setEstado('No se cargó el inicio de sesión de Google. Revisa tu conexión y recarga.', true);
+      return;
+    }
+    var btn = $('btnConectar');
+    var cliente = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPE,
+      callback: async function (resp) {
+        if (resp.error) { setEstado('No se pudo autorizar: ' + resp.error, true); btn.disabled = false; return; }
+        setEstado('Cargando contactos…');
+        try {
+          contactos = await cargarContactos(resp.access_token);
+          lsSet('cumple_contactos', JSON.stringify(contactos));
+          setEstado(contactos.length + ' cumpleaños encontrados.');
+          render();
+        } catch (e) {
+          setEstado(e.message, true);
+        }
+        btn.disabled = false;
+      },
+      error_callback: function (e) {
+        setEstado('No se completó el inicio de sesión (' + (e && e.type ? e.type : 'error') + ').', true);
+        btn.disabled = false;
+      }
+    });
+    btn.disabled = true;
+    cliente.requestAccessToken();
+  }
+
+  $('btnConectar').addEventListener('click', conectar);
+  $('prev').addEventListener('click', function () { mes = (mes + 11) % 12; render(); });
+  $('next').addEventListener('click', function () { mes = (mes + 1) % 12; render(); });
+  $('guardarId').addEventListener('click', function () {
+    var v = $('clientId').value.trim();
+    if (!v) { setEstado('Pega un Client ID válido.', true); return; }
+    lsSet('cumple_client_id', v);
+    setEstado('Client ID guardado. Ya puedes conectar.');
+  });
+  $('borrar').addEventListener('click', function () {
+    lsDel('cumple_contactos'); lsDel('cumple_client_id');
+    contactos = []; $('clientId').value = '';
+    setEstado('Datos borrados de este navegador.');
+    render();
+  });
+
+  $('clientId').value = lsGet('cumple_client_id') || '';
+  if (!lsGet('cumple_client_id')) $('config').open = true;
+  if (location.protocol === 'file:') {
+    setEstado('Abre esta página desde un servidor (por ejemplo http://localhost:8080); Google no permite el inicio de sesión desde un archivo local.', true);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
